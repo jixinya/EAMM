@@ -2,7 +2,7 @@
 
 Xinya Ji, [Hang Zhou](https://hangz-nju-cuhk.github.io/), Kaisiyuan Wang, [Qianyi Wu](https://wuqianyi.top/), [Wayne Wu](http://wywu.github.io/), [Feng Xu](http://xufeng.site/), [Xun Cao](https://cite.nju.edu.cn/People/Faculty/20190621/i5054.html)
 
-[[Project]](https://jixinya.github.io/projects/EAMM/)    [[Paper]](https://arxiv.org/abs/2205.15278)    
+[Project]   [[Paper]](https://arxiv.org/abs/2205.15278)    
 
 ![visualization](demo/teaser.pdf)
 
