@@ -2,9 +2,9 @@
 
 Xinya Ji, [Hang Zhou](https://hangz-nju-cuhk.github.io/), Kaisiyuan Wang, [Qianyi Wu](https://wuqianyi.top/), [Wayne Wu](http://wywu.github.io/), [Feng Xu](http://xufeng.site/), [Xun Cao](https://cite.nju.edu.cn/People/Faculty/20190621/i5054.html)
 
-[Project]   [[Paper]](https://arxiv.org/abs/2205.15278)    
+[[Project]](https://jixinya.github.io/projects/EAMM/)  [[Paper]](https://arxiv.org/abs/2205.15278)    
 
-![visualization](demo/teaser.pdf)
+![visualization](demo/teaser-1.png)
 
 Given a single portrait image, we can synthesize emotional talking faces, where mouth movements match the input audio and facial emotion dynamics follow the emotion source video.
 
@@ -18,7 +18,7 @@ pip install -r requirements.txt
 
 ## Testing
 
-- Download the pre-trained models and data under the following link: google-drive and put the file in corresponding places.
+- Download the pre-trained models and data under the following link: [google-drive](https://drive.google.com/file/d/1IL9LjH3JegyMqJABqMxrX3StAq_v8Gtp/view?usp=sharing) and put the file in corresponding places.
 
 - Run the demo：
   
