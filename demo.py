@@ -41,7 +41,6 @@ if sys.version_info[0] < 3:
     raise Exception("You must use Python 3 or higher. Recommended version is Python 3.6")
 
 
-
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor('./shape_predictor_68_face_landmarks.dat')
 
@@ -186,7 +185,7 @@ def get_aligned_image(driving_video, opt):
 def get_transformed_image(driving_video, opt):
     video_array = np.array(driving_video)
     with open(opt.config) as f:
-        config = yaml.load(f)
+        config = yaml.load(f, Loader=yaml.FullLoader)
     transformations = AllAugmentationTransform(**config['dataset_params']['augmentation_params'])
     transformed_array = transformations(video_array)
     return transformed_array
@@ -228,7 +227,7 @@ def make_animation_smooth(source_image, driving_video, transformed_video, deco_o
                     features.append(emo_detector.feature(transformed_frame).data.cpu().numpy())
             
                 emo_driving_all.append(emo_driving)
-                features = np.array(features)
+        features = np.array(features)
         if opt.add_emo:        
             one_euro_filter_v = OneEuroFilter(mincutoff=1, beta=0.2, dcutoff=1.0, freq=100)#1 0.4
             one_euro_filter_j = OneEuroFilter(mincutoff=1, beta=0.2, dcutoff=1.0, freq=100)#1 0.4
@@ -252,15 +251,15 @@ def make_animation_smooth(source_image, driving_video, transformed_video, deco_o
 
         for frame_idx in tqdm(range(len(deco_out[0]))):
             
-       #     if opt.check_add:
-       #         kp_driving = kp_detector_a(deco_out[:,0])
-       #     else:
-       #         kp_driving = kp_driving_all[frame_idx]
+            if opt.check_add:
+                kp_driving = kp_detector_a(deco_out[:,0])
+            else:
+                kp_driving = kp_driving_all[frame_idx]
 
-        #    kp_driving_real = kp_detector(driving_frame)
+       #     kp_driving_real = kp_detector(driving_frame)
 
-        #    kp_driving['value'] = (1-opt.weight)*kp_driving['value'] + opt.weight*kp_driving_real['value']
-        #    kp_driving['jacobian'] = (1-opt.weight)*kp_driving['jacobian'] + opt.weight*kp_driving_real['jacobian']
+       #     kp_driving['value'] = (1-opt.weight)*kp_driving['value'] + opt.weight*kp_driving_real['value']
+       #     kp_driving['jacobian'] = (1-opt.weight)*kp_driving['jacobian'] + opt.weight*kp_driving_real['jacobian']
 
             if opt.add_emo:
                 emo_driving = emo_driving_all[frame_idx]
@@ -310,11 +309,7 @@ def test_auido(example_image, audio_feature, all_pose, opt):
 
     example_image = np.array(example_image, dtype='float32').transpose((2, 0, 1))
 
-    if not opt.cpu:
-
-        example_image = Variable(torch.FloatTensor(example_image.astype(float)) ).cuda()
-        example_image = torch.unsqueeze(example_image,0)
-        pose = Variable(torch.FloatTensor(pose.astype(float)) ).cuda()
+    
 
 
     speech, sr = librosa.load(test_file, sr=16000)
@@ -345,7 +340,12 @@ def test_auido(example_image, audio_feature, all_pose, opt):
             pose = np.tile(pose, (n,1))
         if(len(pose)>len(input_mfcc)):
             pose = pose[:len(input_mfcc),:]
-
+        
+        if not opt.cpu:
+            example_image = Variable(torch.FloatTensor(example_image.astype(float)) ).cuda()
+            example_image = torch.unsqueeze(example_image,0)
+            pose = Variable(torch.FloatTensor(pose.astype(float)) ).cuda()
+        
         pose = pose.unsqueeze(0)
 
         input_mfcc = input_mfcc.unsqueeze(0)
@@ -466,12 +466,12 @@ def test(opt, name):
    
     driving_video = [resize(frame, (256, 256))[..., :3] for frame in driving_video]
     driving_video = get_aligned_image(driving_video, opt)
-    transformed_video = get_transformed_image(driving_video, all_pose, opt)
+    transformed_video = get_transformed_image(driving_video, opt)
     transformed_video = np.array(transformed_video)
 
     generator, kp_detector,kp_detector_a, audio_feature, emo_detector = load_checkpoints(opt=opt, checkpoint_path=opt.checkpoint, audio_checkpoint_path=opt.audio_checkpoint, emo_checkpoint_path = opt.emo_checkpoint, cpu=opt.cpu)
  
-    deco_out = test_auido(source_image, audio_feature, opt)
+    deco_out = test_auido(source_image, audio_feature, all_pose, opt)
     if len(driving_video) < len(deco_out[0]):
         driving_video = np.resize(driving_video,(len(deco_out[0]),256,256,3))
         transformed_video = np.resize(transformed_video,(len(deco_out[0]),256,256,3))
@@ -505,8 +505,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--config", default ='config/MEAD_emo_video_aug_delta_4_crop_random_crop.yaml', help="path to config")#required=True default ='config/vox-256.yaml'
  
-    parser.add_argument("--audio_checkpoint", default='log/1_6000_crop.pth.tar', help="path to checkpoint to restore")
-    parser.add_argument("--checkpoint", default='124_52000.pth.tar', help="path to checkpoint to restore")
+    parser.add_argument("--audio_checkpoint", default='log/1-6000.pth.tar', help="path to checkpoint to restore")
+    parser.add_argument("--checkpoint", default='log/124_52000.pth.tar', help="path to checkpoint to restore")
    # parser.add_argument("--emo_checkpoint", default='ablation/ablation/ten/10-6000.pth.tar', help="path to checkpoint to restore")
     parser.add_argument("--emo_checkpoint", default='log/5-3000.pth.tar', help="path to checkpoint to restore")
 
