@@ -90,7 +90,7 @@ class OcclusionAwareGenerator(nn.Module):
         for i in range(len(self.up_blocks)):
             out = self.up_blocks[i](out)
         out = self.final(out)
-        out = F.sigmoid(out) #[4,3,256,256]
+        out = torch.sigmoid(out) #[4,3,256,256]
 
         output_dict["prediction"] = out
 

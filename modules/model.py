@@ -155,18 +155,16 @@ class Transform:
 def detach_kp(kp):
     return {key: value.detach() for key, value in kp.items()}
 
-class TrainFullModel(torch.nn.Module):
+class TrainPart1Model(torch.nn.Module):
     """
     Merge all generator related updates into single model for better multi-gpu usage
     """
 
-    def __init__(self, kp_extractor, emo_detector, kp_extractor_a, audio_feature, generator, discriminator, train_params, device_ids):
+    def __init__(self, kp_extractor, kp_extractor_a, audio_feature, generator, discriminator, train_params, device_ids):
         super(TrainFullModel, self).__init__()
         self.kp_extractor = kp_extractor
         self.kp_extractor_a = kp_extractor_a
-        self.emo_detector = emo_detector
-    #    self.content_encoder = content_encoder
-    #    self.emotion_encoder = emotion_encoder
+
         self.audio_feature = audio_feature
         self.generator = generator
         self.discriminator = discriminator
@@ -184,71 +182,47 @@ class TrainFullModel(torch.nn.Module):
             if torch.cuda.is_available():
                 self.vgg = self.vgg.cuda()
         
-       # self.pca = torch.FloatTensor(np.load('/mnt/lustre/jixinya/Home/LRW/list/U_106.npy'))[:, :16].to(device_ids[0])
-      #  self.mean = torch.FloatTensor(np.load('/mnt/lustre/jixinya/Home/LRW/list/mean_106.npy')).to(device_ids[0])
+     
         self.mse_loss_fn   =  nn.MSELoss().cuda()
-        self.CroEn_loss =  nn.CrossEntropyLoss().cuda()
     def forward(self, x):
-   #     source_a_f = self.audio_feature(x['source_audio'],x['source_lm'],x[])
-      #  source_a_f = self.audio_feature(self.content_encoder(x['source_audio'].unsqueeze(1)), self.emotion_encoder(x['source_audio'].unsqueeze(1)))
+ 
         kp_source = self.kp_extractor(x['example_image'])
 
         kp_driving = []
-        emo_features = []
-        fakes = []
         for i in range(16):
             kp_driving.append(self.kp_extractor(x['driving'][:,i]))
-            
-            out, fake = self.emo_detector(x['transformed_driving'][:,i])   
-            emo_features.append(out)
-            fakes.append(fake)
-        
-    #    print('KP_driving ', file=open('/mnt/lustre/jixinya/Home/fomm_audio/log/LRW_test.txt', 'a'))
+
         kp_driving_a = [] #x['example_image'],
-        if self.train_params['type'] == 'add':
-            deco_out = self.audio_feature(x['example_image'], x['driving_audio'], x['driving_pose'], self.train_params['jaco_net'], emo_features)
-        elif self.train_params['type'] == 'adain':
-            deco_out = self.audio_feature.adain_forward(x['example_image'], x['driving_audio'], x['driving_pose'], self.train_params['jaco_net'], emo_features)
-        elif self.train_params['type'] == 'adain_feature':
-            deco_out = self.audio_feature.adain_feature(x['example_image'], x['driving_audio'], x['driving_pose'], self.train_params['jaco_net'], emo_features)
-        elif self.train_params['type'] == 'adain_feature2':
-            deco_out = self.audio_feature.adain_feature2(x['example_image'], x['driving_audio'], x['driving_pose'], self.train_params['jaco_net'], emo_features)
+        deco_out = self.audio_feature(x['example_image'], x['driving_audio'], x['driving_pose'], self.train_params['jaco_net'])
         loss_values = {}
         
-        if self.loss_weights['emo'] != 0:
+        if self.loss_weights['audio'] != 0:
             
             kp_driving_a = []
             for i in range(16):
                 kp_driving_a.append(self.kp_extractor_a(deco_out[:,i]))#
        
-    #    print('Kp_audio_driving ', file=open('/mnt/lustre/jixinya/Home/fomm_audio/log/LRW_test.txt', 'a'))
+   
         loss_value = 0
         loss_heatmap = 0
         loss_jacobian = 0
         loss_perceptual = 0
-        loss_classify = 0
-     #   kp_all = kp_emo
         for i in range(len(kp_driving)):
-            loss_jacobian += (torch.abs(kp_driving[i]['jacobian'] - kp_driving_a[i]['jacobian']).mean())*self.loss_weights['emo']
+            loss_jacobian += (torch.abs(kp_driving[i]['jacobian'] - kp_driving_a[i]['jacobian']).mean())*self.loss_weights['audio']
             
          #   loss_jacobian = loss_jacobian*self.loss_weights['audio']
-            loss_heatmap += (torch.abs(kp_driving[i]['heatmap'] - kp_driving_a[i]['heatmap'] ).mean())*self.loss_weights['emo']*100
+            loss_heatmap += (torch.abs(kp_driving[i]['heatmap'] - kp_driving_a[i]['heatmap']).mean())*self.loss_weights['audio']*100
            
             
-            loss_value += (torch.abs(kp_driving[i]['value'].detach() - kp_driving_a[i]['value']).mean())*self.loss_weights['emo']
-            loss_classify += self.CroEn_loss(fakes[i],x['emotion'])
-            
-     #       kp_all[i]['jacobian'] = kp_emo[i]['jacobian'] + kp_driving[i]['jacobian']
-     #       kp_all[i]['value'] = kp_emo[i]['value'] + kp_driving[i]['value']
-            
+            loss_value += (torch.abs(kp_driving[i]['value'].detach() - kp_driving_a[i]['value']).mean())*self.loss_weights['audio']
+           
         loss_values['loss_value'] = loss_value/len(kp_driving)
         loss_values['loss_heatmap'] = loss_heatmap/len(kp_driving)
         loss_values['loss_jacobian'] = loss_jacobian/len(kp_driving)
-        loss_values['loss_classify'] = loss_classify/len(kp_driving)
-        
+
    
         if self.train_params['generator'] == 'not':
-            loss_values['perceptual'] = self.mse_loss_fn(deco_out,deco_out)
+     #       loss_values['perceptual'] = self.mse_loss_fn(deco_out,deco_out)
             for i in range(1): #0,len(kp_driving),4
  
                 generated = self.generator(x['example_image'], kp_source=kp_source, kp_driving=kp_driving_a[i])
@@ -303,6 +277,141 @@ class TrainFullModel(torch.nn.Module):
         
       
         return loss_values,generated
+
+
+class TrainPart2Model(torch.nn.Module):
+    """
+    Merge all generator related updates into single model for better multi-gpu usage
+    """
+
+    def __init__(self, kp_extractor, emo_feature, kp_extractor_a, audio_feature, generator, discriminator, train_params, device_ids):
+        super(TrainFullModel, self).__init__()
+        self.kp_extractor = kp_extractor
+        self.kp_extractor_a = kp_extractor_a
+
+        self.audio_feature = audio_feature
+        self.emo_feature = emo_feature
+        self.generator = generator
+        self.discriminator = discriminator
+        self.train_params = train_params
+        self.scales = train_params['scales']
+        self.disc_scales = self.discriminator.scales
+        self.pyramid = ImagePyramide(self.scales, generator.num_channels)
+        if torch.cuda.is_available():
+            self.pyramid = self.pyramid.cuda()
+
+        self.loss_weights = train_params['loss_weights']
+
+        if sum(self.loss_weights['perceptual']) != 0:
+            self.vgg = Vgg19()
+            if torch.cuda.is_available():
+                self.vgg = self.vgg.cuda()
+
+        self.mse_loss_fn   =  nn.MSELoss().cuda()
+        self.CroEn_loss =  nn.CrossEntropyLoss().cuda()
+    def forward(self, x):
+ 
+        kp_source = self.kp_extractor(x['example_image'])
+
+        kp_driving = []
+        kp_emo = []
+        for i in range(16):
+            kp_driving.append(self.kp_extractor(x['driving'][:,i]))
+    #        kp_emo.append(self.emo_detector(x['driving'][:,i]))
+
+        kp_driving_a = [] #x['example_image'],
+        deco_out = self.audio_feature(x['example_image'], x['driving_audio'], x['driving_pose'], self.train_params['jaco_net'])
+    #    emo_out = self.emo_feature(x['example_image'], x['driving_audio'], x['driving_pose'], self.train_params['jaco_net'])
+        loss_values = {}
+
+        if self.loss_weights['emo'] != 0:
+
+            kp_driving_a = []
+            fakes = []
+            for i in range(16):
+                kp_driving_a.append(self.kp_extractor_a(deco_out[:,i]))#
+                value = self.kp_extractor_a(deco_out[:,i])['value']
+                jacobian = self.kp_extractor_a(deco_out[:,i])['jacobian']
+                if self.train_params['type'] == 'linear_4' :
+                    out, fake = self.emo_feature(x['transformed_driving'][:,i],value,jacobian)
+                    kp_emo.append(out)
+                    fakes.append(fake)
+                 #   kp_emo.append(self.emo_feature(x['transformed_driving'][:,i],value,jacobian))
+                elif self.train_params['type'] == 'linear_10':
+                 #   kp_emo.append(self.emo_feature.linear_10(x['transformed_driving'][:,i],value,jacobian))
+
+                    out, fake = self.emo_feature.linear_10(x['transformed_driving'][:,i],value,jacobian)
+                    kp_emo.append(out)
+                    fakes.append(fake)
+                elif self.train_params['type'] == 'linear_4_new':
+                 #   kp_emo.append(self.emo_feature.linear_10(x['transformed_driving'][:,i],value,jacobian))
+
+                    out, fake = self.emo_feature.linear_4(x['transformed_driving'][:,i],value,jacobian)
+                    kp_emo.append(out)
+                    fakes.append(fake)
+                elif self.train_params['type'] == 'linear_np_4':
+                 #   kp_emo.append(self.emo_feature.linear_10(x['transformed_driving'][:,i],value,jacobian))
+
+                    out, fake = self.emo_feature.linear_np_4(x['transformed_driving'][:,i],value,jacobian)
+                    kp_emo.append(out)
+                    fakes.append(fake)
+                elif self.train_params['type'] == 'linear_np_10':
+                 #   kp_emo.append(self.emo_feature.linear_10(x['transformed_driving'][:,i],value,jacobian))
+
+                    out, fake = self.emo_feature.linear_np_10(x['transformed_driving'][:,i],value,jacobian)
+                    kp_emo.append(out)
+                    fakes.append(fake)
+          
+        loss_value = 0
+
+        loss_jacobian = 0
+
+        loss_classify = 0
+        kp_all = kp_driving_a
+     
+        for i in range(len(kp_driving)):
+       
+            if self.train_params['type'] == 'linear_4' or self.train_params['type'] == 'linear_4_new' or self.train_params['type'] == 'linear_np_4':
+                loss_jacobian += (torch.abs(kp_driving[i]['jacobian'][:,1] - kp_driving_a[i]['jacobian'][:,1] -kp_emo[i]['jacobian'][:,0]).mean())*self.loss_weights['emo']
+                loss_jacobian += (torch.abs(kp_driving[i]['jacobian'][:,4] - kp_driving_a[i]['jacobian'][:,4] -kp_emo[i]['jacobian'][:,1]).mean())*self.loss_weights['emo']
+                loss_jacobian += (torch.abs(kp_driving[i]['jacobian'][:,6] - kp_driving_a[i]['jacobian'][:,6] -kp_emo[i]['jacobian'][:,2]).mean())*self.loss_weights['emo']
+                loss_jacobian += (torch.abs(kp_driving[i]['jacobian'][:,8] - kp_driving_a[i]['jacobian'][:,8] -kp_emo[i]['jacobian'][:,3]).mean())*self.loss_weights['emo']
+
+                loss_classify += self.CroEn_loss(fakes[i],x['emotion'])
+                loss_value += (torch.abs(kp_driving[i]['value'][:,1] .detach() - kp_driving_a[i]['value'][:,1]  - kp_emo[i]['value'][:,0] ).mean())*self.loss_weights['emo']
+                loss_value += (torch.abs(kp_driving[i]['value'][:,4] .detach() - kp_driving_a[i]['value'][:,4]  - kp_emo[i]['value'][:,1] ).mean())*self.loss_weights['emo']
+                loss_value += (torch.abs(kp_driving[i]['value'][:,6] .detach() - kp_driving_a[i]['value'][:,6]  - kp_emo[i]['value'][:,2] ).mean())*self.loss_weights['emo']
+                loss_value += (torch.abs(kp_driving[i]['value'][:,8] .detach() - kp_driving_a[i]['value'][:,8]  - kp_emo[i]['value'][:,3] ).mean())*self.loss_weights['emo']
+                kp_all[i]['jacobian'][:,1] = kp_emo[i]['jacobian'][:,0] + kp_driving_a[i]['jacobian'][:,1]
+                kp_all[i]['jacobian'][:,4] = kp_emo[i]['jacobian'][:,1] + kp_driving_a[i]['jacobian'][:,4]
+                kp_all[i]['jacobian'][:,6] = kp_emo[i]['jacobian'][:,2] + kp_driving_a[i]['jacobian'][:,6]
+                kp_all[i]['jacobian'][:,8] = kp_emo[i]['jacobian'][:,3] + kp_driving_a[i]['jacobian'][:,8]
+                kp_all[i]['value'][:,1] = kp_emo[i]['value'][:,0] + kp_driving_a[i]['value'][:,1]
+                kp_all[i]['value'][:,4] = kp_emo[i]['value'][:,1] + kp_driving_a[i]['value'][:,4]
+                kp_all[i]['value'][:,6] = kp_emo[i]['value'][:,2] + kp_driving_a[i]['value'][:,6]
+                kp_all[i]['value'][:,8] = kp_emo[i]['value'][:,3] + kp_driving_a[i]['value'][:,8]
+            elif self.train_params['type'] == 'linear_10' or self.train_params['type'] == 'linear_np_10':
+                loss_jacobian += (torch.abs(kp_driving[i]['jacobian'] - kp_driving_a[i]['jacobian'] -kp_emo[i]['jacobian']).mean())*self.loss_weights['emo']
+
+                loss_classify += self.CroEn_loss(fakes[i],x['emotion'])
+                loss_value += (torch.abs(kp_driving[i]['value'].detach() - kp_driving_a[i]['value']  - kp_emo[i]['value'] ).mean())*self.loss_weights['emo']
+
+        #    kp_all[i]['value'] = kp_emo[i]['value'] + kp_driving_a[i]['value']
+
+        loss_values['loss_value'] = loss_value/len(kp_driving)
+  #      loss_values['loss_heatmap'] = loss_heatmap/len(kp_driving)
+        loss_values['loss_jacobian'] = loss_jacobian/len(kp_driving)
+        if self.train_params['classify'] == True:
+            loss_values['loss_classify'] = loss_classify/len(kp_driving)
+        else:
+            loss_values['loss_classify'] = torch.tensor(0, device = loss_values['loss_value'].device)
+        
+        
+
+
+
+        return loss_values,generated
+
 
 class GeneratorFullModel(torch.nn.Module):
     """

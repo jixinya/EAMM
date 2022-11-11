@@ -34,7 +34,19 @@ pip install -r requirements.txt
 
 ## Training
 
-- Coming soon.     
+- Dataset process: Coming soon.     
+
+- Step 1 : Train the Audio2Facial-Dynamics Module using LRW dataset
+
+  `python run.py --config config/train_part1.yaml --mode train_part1 --checkpoint log/124_52000.pth.tar `
+
+- Step 2 : Fine-tune the Audio2Facial-Dynamics Module after getting stable results from step1
+
+  `python run.py --config config/train_part1_fine_tune.yaml --mode train_part1_fine_tune --checkpoint log/124_52000.pth.tar --audio_chechpoint  checkpoint/from/step_1`
+
+- Setp 3 : Train the Implicit Emotion Displacement Learner
+
+  `python run.py --config config/train_part2.yaml --mode train_part2 --checkpoint log/124_52000.pth.tar --audio_chechpoint  checkpoint/from/step_2`
 
 ## Citation
 

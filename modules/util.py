@@ -6,7 +6,6 @@ import numpy as np
 import cv2
 from sync_batchnorm import SynchronizedBatchNorm2d as BatchNorm2d
 
-from modules.ops import *
 from modules.stylegan2 import Generator
 
 import torch.nn as nn
@@ -1737,3 +1736,25 @@ class Emotion_map(nn.Module):
 
         return out, fake
 
+
+def conv2d(channel_in, channel_out,
+           ksize=3, stride=1, padding=1,
+           activation=nn.ReLU,
+           normalizer=nn.BatchNorm2d):
+    layer = list()
+    bias = True if not normalizer else False
+
+    layer.append(nn.Conv2d(channel_in, channel_out,
+                     ksize, stride, padding,
+                     bias=bias))
+    _apply(layer, activation, normalizer, channel_out)
+    # init.kaiming_normal(layer[0].weight)
+
+    return nn.Sequential(*layer)
+
+def _apply(layer, activation, normalizer, channel_out=None):
+    if normalizer:
+        layer.append(normalizer(channel_out))
+    if activation:
+        layer.append(activation())
+    return layer
