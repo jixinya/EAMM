@@ -4,13 +4,13 @@ numpy
 librosa
 opencv-python
 python_speech_features
-pickle
+pickle-mixin
 matplotlib
 scikit-image
 Pillow
 tqdm
 dlib
 scipy
-yaml
+pyyaml
 imageio
 csv
