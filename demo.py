@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Oct  6 20:57:27 2021
-
 @author: thea
 """
 
@@ -431,6 +430,29 @@ def add_audio(video_name=None, audio_dir = None):
     print (command)
     os.system(command)
 
+def crop_image(source_image):
+    
+    template = np.load('./M003_template.npy')
+    image= cv2.imread(source_image)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    rects = detector(gray, 1)  #detect human face
+    if len(rects) != 1:
+        return 0
+    for (j, rect) in enumerate(rects):
+        shape = predictor(gray, rect) #detect 68 points
+        shape = shape_to_np(shape)
+
+    pts2 = np.float32(template[:47,:])
+    pts1 = np.float32(shape[:47,:]) #eye and nose
+    # pts1 = np.float32(landmark[17:35,:])
+    tform = tf.SimilarityTransform()
+    tform.estimate( pts2, pts1) #Set the transformation matrix with the explicit parameters.
+  
+    dst = tf.warp(image, tform, output_shape=(256, 256))
+
+    dst = np.array(dst * 255, dtype=np.uint8)
+    return dst 
+
 def smooth_pose(pose_file, pose_long):
     start = np.load(pose_file)
     video_pose = np.load(pose_long)
@@ -450,7 +472,8 @@ def test(opt, name):
         all_pose = smooth_pose(opt.pose_file,opt.pose_given)
 
     
-    source_image = img_as_float32(io.imread(opt.source_image))
+   # source_image = img_as_float32(io.imread(opt.source_image))
+    source_image = img_as_float32(crop_image(opt.source_image))
     source_image = resize(source_image, (256, 256))[..., :3]
   
     reader = imageio.get_reader(opt.driving_video)
