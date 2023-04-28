@@ -15,6 +15,9 @@ import dlib
 
 from skimage import transform as tf
 
+import librosa
+import python_speech_features
+
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor('./shape_predictor_68_face_landmarks.dat')
 
@@ -77,6 +80,8 @@ def shape_to_np(shape, dtype="int"):
     return coords
 
 
+
+
 def crop_image_tem(video_path, out_path):
     image_all = []
     videoCapture = cv2.VideoCapture(video_path)
@@ -122,6 +127,24 @@ def proc_audio(src_mouth_path, dst_audio_path):
     os.system(audio_command)
 
 
+def audio2mfcc(audio_file, save, name):
+    speech, sr = librosa.load(audio_file, sr=16000)
+  #  mfcc = python_speech_features.mfcc(speech ,16000,winstep=0.01)
+    speech = np.insert(speech, 0, np.zeros(1920))
+    speech = np.append(speech, np.zeros(1920))
+    mfcc = python_speech_features.mfcc(speech,16000,winstep=0.01)
+    if not os.path.exists(save):
+        os.makedirs(save)
+    time_len = mfcc.shape[0]
+    mfcc_all = []
+    for input_idx in range(int((time_len-28)/4)+1):
+         #   target_idx = input_idx + sample_delay #14
+
+        input_feat = mfcc[4*input_idx:4*input_idx+28,:]
+        mfcc_all.append(input_feat)
+    np.save(os.path.join(save,name+'.npy'), mfcc_all)
+
+    print(input_idx)
 
 if __name__ == "__main__":
     #video alignment
@@ -139,5 +162,22 @@ if __name__ == "__main__":
     dst_audio_path = './test/audio/00015.mov'
     proc_audio(src_mouth_path, dst_audio_path)
 
+    #audio2mfcc
+    #mead
+    path = './dataset/MEAD/audio/'
+    pathDir = os.listdir(path)
+    for i in range(len(pathDir)):#len(pathDir)
+        name = pathDir[i]
+        filepath = os.path.join(path,name)
+        if os.path.exists(filepath):
+            Dir = os.listdir(filepath)
+            save_path = './dataset/MEAD/MEAD_MFCC/'+name
+            os.makedirs(save_path,exist_ok=True)
+            for j in range(len(Dir)):
 
-
+                index = Dir[j].split('.')[0]
+                audio_path = os.path.join(filepath,Dir[j])
+                audio2mfcc(audio_path, save_path,index)
+                print(i,name,j,index)
+        else:
+            print('not exist ',filepath)
